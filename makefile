@@ -1,11 +1,7 @@
-all: rshell commands.o connecters.o
+all: rshell
 
-commands.o: commands.cc commands.h
-	g++ -c -Wall -Werrer -ansi -pedantic commands.cc
-
-connecters.o: connecters.cc connecters.h
-	g++ -c -Wall -Werror -ansi -pedantic connecters.cc
-
-rshell: main.cc
-	g++ -c -Wall -Werror -ansi -pedantic main.cc -o rshell
-
+rshell: hwcode.cc
+	g++ -Wall -Werror -ansi -pedantic hwcode.cc -o rshell
+	mkdir bin
+	chmod 700 rshell
+	mv rshell bin

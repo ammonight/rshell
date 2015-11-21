@@ -8,6 +8,7 @@
 #include <string>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 using namespace std;
 
@@ -50,8 +51,9 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       count = 0;
       i++;
+      delete[] copy;
     }
-    
+
     if (line[i] == '&' && line[i+1] == '&') {
       char* copy = new char[count+1];
       strcpy (copy, command);
@@ -60,8 +62,9 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       i+=2;
       count = 0;
+      delete[] copy;
     }
- 
+
     if (line[i] == '|' && line[i+1] == '|') {
       char* copy = new char[count+1];
       strcpy (copy, command);
@@ -70,6 +73,7 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       i+=2;
       count = 0;
+      delete[] copy;
     }
 
     if (line[i] == '[') {
@@ -80,6 +84,7 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       count = 0;
       i++;
+      delete[] copy;
     }
 
     if (line[i] == ']') {
@@ -90,6 +95,7 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       count = 0;
       i++;
+      delete[] copy;
     }
 
     if (line[i] == '(') {
@@ -100,6 +106,7 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       count = 0;
       i++;
+      delete[] copy;
     }
    
     if (line[i] == ')') {
@@ -110,6 +117,7 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       count = 0;
       i++;
+      delete[] copy;
     }
 
     if (line[i] == ' ' && line[i+1] == 't' && line[i+2] == 'e' &&
@@ -121,6 +129,7 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       count = 0;
       i+=5;
+      delete[] copy;
     }
 
     //seperates out 'test' if flanked by spaces or beginning of command
@@ -134,6 +143,7 @@ vector<string> parsing (char *line) {
       command[0] = '\0';
       count = 0;
       i+=4;
+      delete[] copy;
     }
 
     command[count] = line[i];
@@ -145,7 +155,7 @@ vector<string> parsing (char *line) {
   vector<string> strings;
   string str;
   for (unsigned i = 0; i < result.size(); i++) {
-//    cout << result.at(i) << endl;
+    cout << result.at(i) << endl;
     str = result.at(i);
     strings.push_back(str);
   }
@@ -240,7 +250,7 @@ void whitespace(char *lcmnds, char **argParams){
 
 
 //takes in separated vector of commands and executes them
-int execForkVp( char **argParams) {
+bool execForkVp( char **argParams) {
 
   pid_t c_pid;
   int status;
@@ -249,14 +259,14 @@ int execForkVp( char **argParams) {
 
   if( c_pid < 0){ 
     perror("fork failed");
-    exit(1);
+    return false;
   }
 
   else if( c_pid == 0 ){  //MOST IMPORTANT PART OF FNCTN
 
     printf("Child: executing command\n");
     if (execvp( *argParams, argParams) < 0) {
-      return 3; //This means that execvp failed
+      return false; //This means that execvp failed
     }
   }
 
@@ -277,7 +287,7 @@ int execForkVp( char **argParams) {
   }
 
 */
-  return 1;
+  return true;
 
 }
 
@@ -307,6 +317,11 @@ int main(){
       cout << temp[0] << endl;
       delete [] csttr;
     }*/
+
+    bool executed = false;
+    bool toExecute = true;
+    bool toTest = false;
+    int testFlag = 0;
     commandList = parsing(wholeLine); 
     for (unsigned i = 0; i < commandList.size(); i++) {
       char *argParams[100]; 
@@ -318,8 +333,103 @@ int main(){
       if (strcmp (argParams[0], "exit") == 0) {
         exit(0);
       }
-      
-      execForkVp (argParams);
+
+      if (toExecute) {
+        executed = execForkVp (argParams);
+        toExecute = false;
+        continue;
+      }
+     
+      if (strcmp (argParams[0], ";") == 0) {
+        toExecute = true; 
+        continue;
+      }
+
+      if (strcmp (argParams[0], "&&") == 0 && executed) {
+        toExecute = true; 
+        continue;
+      }
+
+      if (strcmp (argParams[0], "||") == 0 && !executed) {
+        toExecute = true;
+        continue;
+      }
+
+      if (strcmp (argParams[0], "test") == 0) {
+        toTest = true;
+        continue;
+      }
+
+      if (toTest) {
+        int offset = 1;
+        cout << "param list: " << argParams[0] << " " << argParams[1] << endl;
+        if (strcmp (argParams[0], "-d") == 0) {
+          testFlag = 1;
+        }
+        else if (strcmp (argParams[0], "-f") == 0) {
+          testFlag = 2;
+        }
+        else if (strcmp (argParams[0], "-e") == 0) {
+          testFlag = 3;
+        }
+        else {
+          offset = 0;
+          testFlag = 3;
+        }
+
+ 
+        struct stat sb;
+        if (stat(argParams[offset], &sb) == -1) {
+          perror ("stat");
+          exit(EXIT_FAILURE);
+        }
+
+        executed = false;
+        if (S_ISREG(sb.st_mode)) {
+          if (testFlag == 2 || testFlag == 3) {
+            executed = true;
+          }
+        }
+        if (S_ISDIR(sb.st_mode)) {
+          if (testFlag == 1 || testFlag == 3) {
+            executed = true;
+          }
+        }
+
+
+      /*  if (testFlag == 1) {
+          if ((sb.st_mode & S_IFMT) == S_IFDIR) {
+            executed = true;
+          }
+          else {
+            executed = false;
+          }
+        }
+        else if (testFlag == 2) { 
+          if ((sb.st_mode & S_IFMT) == S_IFREG) {
+             executed = true;
+          }
+          else {
+            executed = false;
+          }
+        }
+        else {
+          if (((sb.st_mode & S_IFMT) == S_IFREG) || 
+            ((sb.st_mode & S_IFMT) == S_IFDIR)) {
+            executed = true;
+          }
+          else {
+            executed = false;
+          }
+        }*/
+//        switch (sb.st_mode & S_IFMT) {
+//          case S_IFDIR: if (testFlag == 1 || testFlag == 3) executed = true;
+//          case S_IFREG: if (testFlag == 2 || testFlag == 3) executed = true;
+//          default: executed = false;
+//        }
+        continue;
+      }
+ 
     }
 
     //for( int i = 0; i <= DiffAP.size(); i++){

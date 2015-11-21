@@ -117,6 +117,8 @@ vector<string> parsing (char *line) {
       i+=5;
     }
 
+    //seperates out 'test' if flanked by spaces or beginning of command
+    
     if (i == 0 && line[i] == 't' && line[i+1] == 'e' &&
         line[i+2] == 's' && line[i+3] == 't' && line[i+4] == ' ') {
       char* copy = new char[count+1];
